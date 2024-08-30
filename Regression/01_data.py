@@ -22,6 +22,8 @@ import umap
 from joblib import dump, load
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import IncrementalPCA
+
+
 # %% 1. Download all SP500 data and save
 t0 = time.time()
 # make list of constituents
@@ -48,19 +50,19 @@ print("Cleaning data took", (t1 - t0), "seconds")
 
 # %% 3. Add Target Variable
 #load stocks df if needed
-#stocks = pd.read_parquet(stocks_path_parquet)
+stocks = pd.read_parquet(stocks_path_parquet)
 
 stocks = add_target_ndays_change(stocks, ndays = 5)
 
 #And create just the datetime and target, as a final df, ready to be added to with engineered features
-engineered_df = stocks[['Datetime', 'y']].reset_index(drop = True)
+engineered_df = stocks[['Date', 'y']].reset_index(drop = True)
 #%% 4.Initialise Feature data
 
 feature_functions_list = [
-    [engineer_ta_features(), "ta"],
-    [engineer_basic_features(), "basic"],
-     [engineer_zigzag_features(),  "zigzag"],
-     [engineer_categorical_features(), "categorical"]]
+    [engineer_ta_features, "ta"],
+    [engineer_basic_features, "basic"],
+     [engineer_zigzag_features,  "zigzag"],
+     [engineer_categorical_features, "categorical"]]
 
 '''
 NOTE: the categorical features must come LAST, as it relies on features built elsewhere 

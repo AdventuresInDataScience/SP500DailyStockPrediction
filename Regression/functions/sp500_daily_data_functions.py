@@ -143,10 +143,10 @@ def engineer_basic_features(stocks):
     print("Gaps added")
 
     # 10 - Dates
-    df["DayofWeek"] = stocks["Datetime"].dt.dayofweek
-    df["Month"] = stocks["Datetime"].dt.month
-    df["Hour"] = stocks["Datetime"].dt.hour
-    df["DayofMonth"] = stocks["Datetime"].dt.day
+    df["DayofWeek"] = stocks["Date"].dt.dayofweek
+    df["Month"] = stocks["Date"].dt.month
+    df["Hour"] = stocks["Date"].dt.hour
+    df["DayofMonth"] = stocks["Date"].dt.day
     print("Dates Added")
 
     return df
