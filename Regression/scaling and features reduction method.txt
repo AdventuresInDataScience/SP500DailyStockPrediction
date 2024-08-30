@@ -1,0 +1,105 @@
+Now lets say instead of an iterable, I have a functions called add_features1(), add_features2() etc. I want to input a df, and return the same df but with the new features calculated, then scaled, then reduced down by PCA. I want this done over every add_features function, with a final result being a df with just the PCA'd features, as well as a final PCA and scaler model. I would also like an example of how I would then use this on new data
+
+1. Define Your Feature Engineering Functions
+Assuming these functions modify the input dataframe by adding new features:
+
+python
+Copy code
+def add_features1(df):
+    # Example: Adding new features to df
+    df['new_feature_1'] = df['existing_feature'] * 2
+    return df
+
+def add_features2(df):
+    # Example: Adding new features to df
+    df['new_feature_2'] = df['existing_feature'] ** 2
+    return df
+
+# Add more feature functions as needed...
+2. Pipeline for Incremental PCA with Scaling
+This code will process each batch of features, scaling them with StandardScaler and reducing them with IncrementalPCA.
+
+python
+Copy code
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import IncrementalPCA
+
+# Assuming df is your initial dataframe
+df = pd.DataFrame({
+    'existing_feature': [1, 2, 3, 4, 5]  # Replace with actual data
+})
+
+# Initialize StandardScaler and IncrementalPCA
+scaler = StandardScaler()
+n_components = 10  # Adjust based on desired dimensionality
+ipca = IncrementalPCA(n_components=n_components)
+
+# List of your feature functions
+feature_functions = [add_features1, add_features2]  # Add more as needed
+
+# Process each feature function incrementally
+for add_features_fn in feature_functions:
+    # Generate new features
+    df = add_features_fn(df)
+    
+    # Select only the newly added features to scale and reduce
+    new_features = df.iloc[:, -10_000:]  # Adjust based on the number of new features
+    
+    # Scale and update the scaler model
+    scaled_features = scaler.partial_fit_transform(new_features)
+    
+    # Apply IncrementalPCA and update the PCA model
+    reduced_features = ipca.partial_fit_transform(scaled_features)
+    
+    # Replace the new features with the reduced ones in the dataframe
+    df = df.iloc[:, :-10_000]  # Remove the old batch of new features
+    reduced_df = pd.DataFrame(reduced_features, index=df.index)
+    df = pd.concat([df, reduced_df], axis=1)
+
+# The df now contains only the final reduced features
+3. Using the Final Scaler and PCA on New Data
+You can now use the fitted scaler and ipca models to process new data.
+
+python
+Copy code
+def process_new_data(new_df):
+    # Apply all feature engineering functions
+    for add_features_fn in feature_functions:
+        new_df = add_features_fn(new_df)
+        
+        # Select only the newly added features to scale and reduce
+        new_features = new_df.iloc[:, -10_000:]  # Adjust based on number of new features
+        
+        # Scale using the saved scaler
+        scaled_features = scaler.transform(new_features)
+        
+        # Reduce using the saved PCA model
+        reduced_features = ipca.transform(scaled_features)
+        
+        # Replace the new features with the reduced ones in the dataframe
+        new_df = new_df.iloc[:, :-10_000]  # Remove the old batch of new features
+        reduced_df = pd.DataFrame(reduced_features, index=new_df.index)
+        new_df = pd.concat([new_df, reduced_df], axis=1)
+    
+    return new_df
+
+# Example usage with new data
+new_data = pd.DataFrame({
+    'existing_feature': [6, 7, 8, 9, 10]  # Replace with actual new data
+})
+
+processed_new_data = process_new_data(new_data)
+Explanation:
+Feature Engineering Loop: Each add_features function is applied sequentially, generating new features. Only the new features from each step are scaled and reduced.
+
+Partial Fitting: StandardScaler and IncrementalPCA are updated incrementally using partial_fit_transform for the training data. This allows them to learn from the new data added in each step.
+
+Final Model: After processing all feature functions, the final dataframe (df) contains only the reduced features.
+
+New Data Processing: The process_new_data function shows how to apply the same transformations to new data, ensuring consistency with the training data.
+
+This approach scales well with large datasets and ensures that you only need to maintain a single StandardScaler and IncrementalPCA model, reducing the complexity of handling many features.  
+
+
+This final set of features can then be scaled again using UMAP
