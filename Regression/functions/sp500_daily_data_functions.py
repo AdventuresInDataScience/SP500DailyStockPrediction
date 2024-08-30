@@ -164,7 +164,7 @@ def engineer_ta_features(stocks):
     ta_range.extend(range(21, 41, 2))
     ta_range.extend(range(41, 202, 5))
 
-    for n in range(ta_range):
+    for n in ta_range:
         indicator = "SMA"
         df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
             lambda x: (ta.trend.SMAIndicator(x['Close'], window = n).sma_indicator() - x['Close'])/ 
@@ -212,7 +212,7 @@ def engineer_ta_features(stocks):
             lambda x: ta.momentum.RSIIndicator(x['Close'], window = n).rsi())
         print("RSI added")
         
-        for i in range(ta_range):
+        for i in ta_range:
             if n > i:
                 indicator = "MACD"
                 df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
