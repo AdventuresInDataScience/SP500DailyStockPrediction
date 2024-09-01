@@ -101,6 +101,29 @@ ipca = IncrementalPCA(n_components=n_components)
 #     output = pd.DataFrame(reduced_X, columns=column_names)
     
 #     engineered_df = pd.concat([engineered_df, output])
+
+#%%  NEW FIX IS FROM HERE:
+# Add basic features - approx 9 mins
+stocks = pd.read_parquet(stocks_path_parquet)
+stocks['Date'] = pd.to_datetime(stocks['Date'])
+stocks = add_target_ndays_change(stocks, ndays = 5)
+model_container = {'ipca': IncrementalPCA(n_components=50),
+                     'scaler': StandardScaler()}
+data = stocks[stocks['Ticker'].isin(['MSFT', 'V'])]
+
+t0 = time.time()
+test2 = data.groupby('Ticker').apply(engineer_basic_features_group, model_container = model_container).reset_index(drop=True)
+
+t1 = time.time()
+print("Feature Engineering data took", (t1 - t0)/60, "minutes")
+
+
+
+
+
+
+
+
 #%% Add TA features
 t0 = time.time()
 engineered_df, scaler, ipca = update_engineerd_df(engineered_df, stocks, scaler, ipca, feature_functions_list[0])

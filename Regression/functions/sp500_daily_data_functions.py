@@ -151,8 +151,6 @@ def engineer_basic_features(stocks):
 
     return df
 
-
-
 def engineer_ta_features(stocks):
     '''
     returns a df of TA features only, no other values
@@ -168,32 +166,32 @@ def engineer_ta_features(stocks):
         indicator = "SMA"
         df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
             lambda x: (ta.trend.SMAIndicator(x['Close'], window = n).sma_indicator() - x['Close'])/ 
-            ta.volatility.ATR(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
+            ta.volatility.AverageTrueRange(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
         print("SMA added")
 
         indicator = "EMA"
         df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
             lambda x: (ta.trend.EMAIndicator(x['Close'], window = n).ema_indicator() - x['Close'])/ 
-            ta.volatility.ATR(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
+            ta.volatility.AverageTrueRange(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
         print("EMA added")
 
         indicator = "Aroon"
         df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
             lambda x:(ta.trend.AroonIndicator(x['Close'], x['Low'], window = n, fillna = True).aroon_up() - ta.trend.AroonIndicator(x['Close'], x['Low'], window = n, fillna = True).aroon_down())/
-            ta.volatility.ATR(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
+            ta.volatility.AverageTrueRange(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
         print("Aroon added")           
         
         indicator = "ADX"
         df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
             lambda x:(ta.trend.ADXIndicator(x['High'], x['Low'], x['Close'], window = n).adx_pos() - ta.trend.ADXIndicator(x['High'], x['Low'], x['Close'], window = n).adx_neg())/
-            ta.volatility.ATR(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
+            ta.volatility.AverageTrueRange(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
         print("ADX added")    
         
-        indicator = "ATR"
+        indicator = "AverageTrueRange"
         df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
             lambda x:ta.volatility.AverageTrueRange(x['High'], x['Low'], x['Close'], window = n).average_true_range()/
             ta.volatility.AverageTrueRange(x['High'], x['Low'], x['Close'], window = 14).average_true_range()).reset_index(0, drop=True)
-        print("ATR added")
+        print("AverageTrueRange added")
         
         indicator = "DonchianU"
         df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
@@ -217,7 +215,7 @@ def engineer_ta_features(stocks):
                 indicator = "MACD"
                 df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
                     lambda x: ta.trend.MACD(x['Close'], window_slow = n, window_fast= i).macd()/ 
-                    ta.volatility.ATR(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
+                    ta.volatility.AverageTrueRange(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
         print("MACD added")
 
         
@@ -236,7 +234,6 @@ def engineer_ta_features(stocks):
         #stocks[f'indicator'] = stocks['Close'] > stocks['Close'].shift(n) # excluded as should be same info as in Donchian Channels
 
     return df
-
 
 def engineer_zigzag_features(stocks):
     '''
@@ -291,9 +288,8 @@ def engineer_zigzag_features(stocks):
     
     return df
 
-
-# Onehot encoding is slightly different. We have to make a one-hot array, then append it to the dataframe, then drop the original value. This is easier with pd.get_dummies
 def engineer_categorical_features(stocks, column_list = OHE_list):
+    # Onehot encoding is slightly different. We have to make a one-hot array, then append it to the dataframe, then drop the original value. This is easier with pd.get_dummies
     '''
     One hot encodes Cateogrical columns
     returns a df of OHE features only, no other values
@@ -305,7 +301,6 @@ def engineer_categorical_features(stocks, column_list = OHE_list):
         df = pd.concat([df, tempdf], axis = 1)
         
     return df
-
 
 def update_engineerd_df(engineered_df, stocks, scaler, ipca, sub_list):
     '''
@@ -331,7 +326,6 @@ def update_engineerd_df(engineered_df, stocks, scaler, ipca, sub_list):
 
     return (engineered_df, scaler, ipca)
 
-
 def umap_reduce(stocks, X, y = 'y', prefix = "", n = 15, components = 20, metric = 'l2'):
     '''
 reduces X variables, based on y. Returns:
@@ -346,23 +340,6 @@ reduces X variables, based on y. Returns:
     output = pd.DataFrame(X_umap, columns=column_names)
     output = pd.concat([stocks, output])
     return (output, reducer)
-
-# def umap_reduce_inline(X, y, n = 15, components = 4, metric = 'l2'):
-#     '''
-#     reduces X variables, based on y. Does this during feature construction, so as to  limit memory
-#     by making changes step by step rather than on the whole feature set:
-#     [0] new, smaller set of X variables
-#     [1] The already fitted reducer model used to reduce the features
-#     '''
-#     reducer = umap.UMAP(n_neighbors=n, min_dist=0.1, n_components=components, target_metric= metric)
-#     X_umap = reducer.fit_transform(X = X, y=y)
-
-#     naming_string = "string1"
-#     # Create column names
-#     column_names = [f"{naming_string}_{i+1}" for i in range(X_umap.shape[1])]
-#     # Convert to Pandas DataFrame
-#     df = pd.DataFrame(X_umap, columns=column_names)
-#     return (X_umap, reducer)
 
 def add_target_ndays_change(stocks, ndays = 5):
     nextdayopen = stocks.groupby("Ticker")["Open"].shift(-1)
@@ -397,3 +374,165 @@ def add_target_ndays_change(stocks, ndays = 5):
 #     df = stocks.merge(etf_df, on="Date", how="left")
 #     df = df.merge(macro_df, on="Date", how="left")
 #     return df
+
+# def umap_reduce_inline(X, y, n = 15, components = 4, metric = 'l2'):
+#     '''
+#     reduces X variables, based on y. Does this during feature construction, so as to  limit memory
+#     by making changes step by step rather than on the whole feature set:
+#     [0] new, smaller set of X variables
+#     [1] The already fitted reducer model used to reduce the features
+#     '''
+#     reducer = umap.UMAP(n_neighbors=n, min_dist=0.1, n_components=components, target_metric= metric)
+#     X_umap = reducer.fit_transform(X = X, y=y)
+
+#     naming_string = "string1"
+#     # Create column names
+#     column_names = [f"{naming_string}_{i+1}" for i in range(X_umap.shape[1])]
+#     # Convert to Pandas DataFrame
+#     df = pd.DataFrame(X_umap, columns=column_names)
+#     return (X_umap, reducer)
+
+def engineer_basic_features_group(group, model_container):
+    '''
+    returns a df of basic features only, no other values
+    '''
+    df = pd.DataFrame(index=group.index)
+
+    #) A Make features and add them to a new df
+    # 1  - Feature Engineering - Lags
+    for n in range(1, 40):
+        df[f"Close.lag{n}"] = group["Close"].shift(n)
+    # 2- Feature Engineer 2 - Changes(normalised)
+    for n in range(1, 40):
+        df[f"Close.change{n}"] = group["Close"] / group["Close"].shift(n)
+    # 3 - Feature Engineer 3 - Range (normalised)
+    for n in range(1, 40):
+        df[f"Close.range{n}"] = (group["High"].rolling(n).max() - group["Low"].rolling(n).min())/group["Close"]
+    # 4 - Feature Engineer 4 - Distance from Low(normalised)
+    for n in range(1, 40):
+        df[f"Low.tolow{n}"] = group["Low"] / group["Low"].shift(n)
+    # 5 - Feature Engineer 5 - Distance from High (normalised)
+    for n in range(1, 40):
+        df[f"High.toHigh{n}"] = group["High"] / group["High"].shift(n)
+    # 6 - Feature Engineer 7 - Distance from Highest High
+    for n in range(1, 40):
+        df[f"Close.hh{n}"] = group["Close"] / group["High"].rolling(n).max()
+    # 7 - Feature Engineer 8 - Distance from Lowest Low
+    for n in range(1, 40):
+        df[f"Close.ll{n}"] = group["Close"] / group["Low"].rolling(n).min()
+    # 8 - Feature Engineer 10 - Standard Deviation. This is the one causing probs. std doesnt work with NAs
+    for n in range(2, 40):
+        df[f"Close.sd{n}"] = group["Close"].rolling(n).std()
+    # 9 - Feature Engineer 10 - normalised value for previous Gap,
+    df["Last.Gap"] = (group["Open"] - group["Close"].shift(1)) / group["Open"]
+    # 10 - Dates
+    df["DayofWeek"] = group["Date"].dt.dayofweek
+    df["Month"] = group["Date"].dt.month
+    df["Hour"] = group["Date"].dt.hour
+    df["DayofMonth"] = group["Date"].dt.day
+
+    #B) Reduce Features
+    ipca = model_container['ipca']
+    scaler = model_container['scaler']
+
+    #remove nas and infs as they dont scale
+    df = df.fillna(0).replace([np.inf, -np.inf], 0)
+    # Scale and update the scaler model
+    scaler = scaler.partial_fit(df)
+    scaled_X = scaler.transform(df)
+    # Apply IncrementalPCA and update the PCA model
+    ipca = ipca.partial_fit(scaled_X)
+    reduced_X = ipca.transform(scaled_X)
+    #Add column names to results
+    column_names = [f"basic_{i+1}" for i in range(reduced_X.shape[1])]
+    output = pd.DataFrame(reduced_X, columns=column_names, index = group.index)    
+    #join to engineerd_df (final df)
+    result = pd.concat([group, output], axis=1)
+    # Update the global models in the container
+    model_container['ipca'] = ipca
+    model_container['scaler'] = scaler
+
+    return result
+
+def engineer_ta_features(group, model_container):
+    '''
+    returns a df of TA features only, no other values
+    '''
+    df = pd.DataFrame()
+    # Technical Indicators
+    ta_range = []
+    ta_range.extend(range(1, 21, 1))
+    ta_range.extend(range(21, 41, 2))
+    ta_range.extend(range(41, 202, 5))
+
+    for n in ta_range:
+        indicator = "SMA"
+        df[f'{indicator}_{n}'] =(
+            (ta.trend.SMAIndicator(group['Close'], window = n).sma_indicator() - group['Close'])/
+            ta.volatility.AverageTrueRange(group['Close'], group['High'], group['Low'], window = 14).average_true_range())
+
+        indicator = "EMA"
+        df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
+            lambda x: (ta.trend.EMAIndicator(x['Close'], window = n).ema_indicator() - x['Close'])/ 
+            ta.volatility.AverageTrueRange(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
+        print("EMA added")
+
+        indicator = "Aroon"
+        df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
+            lambda x:(ta.trend.AroonIndicator(x['Close'], x['Low'], window = n, fillna = True).aroon_up() - ta.trend.AroonIndicator(x['Close'], x['Low'], window = n, fillna = True).aroon_down())/
+            ta.volatility.AverageTrueRange(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
+        print("Aroon added")           
+        
+        indicator = "ADX"
+        df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
+            lambda x:(ta.trend.ADXIndicator(x['High'], x['Low'], x['Close'], window = n).adx_pos() - ta.trend.ADXIndicator(x['High'], x['Low'], x['Close'], window = n).adx_neg())/
+            ta.volatility.AverageTrueRange(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
+        print("ADX added")    
+        
+        indicator = "AverageTrueRange"
+        df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
+            lambda x:ta.volatility.AverageTrueRange(x['High'], x['Low'], x['Close'], window = n).average_true_range()/
+            ta.volatility.AverageTrueRange(x['High'], x['Low'], x['Close'], window = 14).average_true_range()).reset_index(0, drop=True)
+        print("AverageTrueRange added")
+        
+        indicator = "DonchianU"
+        df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
+            lambda x:(ta.volatility.DonchianChannel(x['High'], x['Low'], x['Close'], window = n).donchian_channel_lband() - x['Close'])/
+            ta.volatility.AverageTrueRange(x['High'], x['Low'], x['Close'], window = 14).average_true_range()).reset_index(0, drop=True)
+        print("Donchian U added")
+        
+        indicator = "DonchianL"
+        df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
+            lambda x:(ta.volatility.DonchianChannel(x['High'], x['Low'], x['Close'], window = n).donchian_channel_hband() - x['Close'])/
+            ta.volatility.AverageTrueRange(x['High'], x['Low'], x['Close'], window = 14).average_true_range()).reset_index(0, drop=True)
+        print("Donchian L added")
+        
+        indicator = "RSI"
+        df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
+            lambda x: ta.momentum.RSIIndicator(x['Close'], window = n).rsi())
+        print("RSI added")
+        
+        for i in ta_range:
+            if n > i:
+                indicator = "MACD"
+                df[f'{indicator}_{n}'] = stocks.groupby("Ticker").apply(
+                    lambda x: ta.trend.MACD(x['Close'], window_slow = n, window_fast= i).macd()/ 
+                    ta.volatility.AverageTrueRange(x['Close'], x['High'], x['Low'], window = 14).average_true_range()).reset_index(0, drop=True)
+        print("MACD added")
+
+        
+        for sd in [0.5,1,1.5,2,2.5,3]:
+            indicator = "BBandU"
+            df[f'{indicator}_{n}_{sd}'] = stocks.groupby("Ticker").apply(
+            lambda x:(ta.volatility.BollingerBands(x['Close'], window = n, window_dev = sd).bollinger_hband() - x['Close'])/
+            ta.volatility.AverageTrueRange(x['High'], x['Low'], x['Close'], window = 14).average_true_range()).reset_index(0, drop=True)
+
+            indicator = "BBandL"
+            df[f'{indicator}_{n}_{sd}'] = stocks.groupby("Ticker").apply(
+            lambda x:(ta.volatility.BollingerBands(x['Close'], window = n, window_dev = sd).bollinger_lband() - x['Close'])/
+            ta.volatility.AverageTrueRange(x['High'], x['Low'], x['Close'], window = 14).average_true_range()).reset_index(0, drop=True)
+        print("Bollinger Bans Both added")
+        #indicator = "NowvsxDaysAgo"
+        #stocks[f'indicator'] = stocks['Close'] > stocks['Close'].shift(n) # excluded as should be same info as in Donchian Channels
+
+    return df
