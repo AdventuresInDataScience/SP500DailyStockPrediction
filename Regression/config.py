@@ -31,7 +31,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import IncrementalPCA
 
 # Variables that need one hot encoding, and other paths
-OHE_list = ["sector", "industry", "DayofWeek", "Month"]
+OHE_list = ["sector", "industry"]
 scaler_model_path = (
     "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/scaler_model.joblib"
 )

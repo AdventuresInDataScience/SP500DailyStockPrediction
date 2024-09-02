@@ -33,89 +33,103 @@ ticker_list, constituents = make_ticker_list()
 stocks = get_yahoo_data(ticker_list, constituents, interval="1d")
 
 # SAVE/LOAD CHECKPOINT
-# stocks.to_csv(stocks_path, index = False)
-stocks = pd.read_csv(stocks_path)
+stocks.to_parquet(stocks_path_parquet, index = False, compression='gzip')
+# stocks = pd.read_parquet(stocks_path_parquet)
 
 t1 = time.time()
 print("Retrieving data took", (t1 - t0), "seconds")
-# %% 2. Basic Data Cleaning
+
+# %% 2. Add Target Variable
+#load stocks df if needed
+# stocks = pd.read_parquet(stocks_path_parquet)
+
+stocks = add_target_ndays_change(stocks, ndays = 5)
+stocks['Date'] = pd.to_datetime(stocks['Date']) # make date a datetime
+stocks = stocks.dropna() # drop na values in the y column ie the last value
+stocks = stocks.groupby('Ticker').filter(lambda x: len(x) >= 200) # Only keep groups with 200 obs or more
+stocks = memory_downcast_numeric(stocks) # reduce filesize in memory
+
+#%% 3. Add basic features - approx 6.27 mins
+
+'''
+ALL FEATURE ENGINEERING STILL REQUIRES
+That the models be saved to their own savepaths after the fact, but also that a umap can be built afterwards, since saving the intermediate result will be much too large a file
+Once the file is built, and all scalers umaps etc are saved, the file can be saved as a gzipped parquet file, ready for modelling
+
+'''
+basic_model_container = {'ipca': IncrementalPCA(n_components=4),
+                     'scaler': StandardScaler()}
+
 t0 = time.time()
-stocks = clean_stocks(stocks, remove_1s=False)
+stocks = stocks.groupby('Ticker').apply(engineer_basic_features_group, model_container = basic_model_container).reset_index(drop=True)
+stocks = memory_downcast_all(stocks)
+#Basic features finishes as approx 1.3 Gb after downcast
+#Takes approx 6.27 mins to run on 50 PCA components
 t1 = time.time()
-print("Cleaning data took", (t1 - t0), "seconds")
+print("Feature Engineering data took", (t1 - t0)/60, "minutes")
+
+
+#%% 4. Add TA features - approx 180 mins
+ta_model_container = {'ipca': IncrementalPCA(n_components=4),
+                     'scaler': StandardScaler()}
+
+t0 = time.time()
+stocks = stocks.groupby('Ticker').apply(engineer_ta_features_group, model_container = ta_model_container).reset_index(drop=True)
+stocks = memory_downcast_all(stocks)
+# Basic features finishes as approx 4.9gb for 200 components
+# Takes approx 3 hours for 200 components
+t1 = time.time()
+print("Feature Engineering data took", (t1 - t0)/60, "minutes")
+
+
+#%% 5. Add ZIGZAG features - approx 32 mins
+zz_model_container = {'ipca': IncrementalPCA(n_components=4),
+                     'scaler': StandardScaler()}
+
+t0 = time.time()
+stocks = stocks.groupby('Ticker').apply(engineer_zigzag_features_group, model_container = zz_model_container).reset_index(drop=True)
+stocks = memory_downcast_all(stocks)
+# Basic features finishes as approx 0.27 Gb after downcast
+# Takes 32 mins to run on 4 PCA components
+t1 = time.time()
+print("Feature Engineering data took", (t1 - t0)/60, "minutes")
+
+#%% 6. Add SIC features - approx 0.1 mins
+sic_model_container = {'ipca': IncrementalPCA(n_components=4),
+                     'scaler': StandardScaler()}
+
+t0 = time.time()
+stocks = engineer_categorical_features(stocks, sic_model_container, column_list = OHE_list)
+stocks = memory_downcast_all(stocks)
+# Basic features finishes as approx 0.25 Gb after downcast
+# Takes 0.1 mins to run on 4 PCA components
+t1 = time.time()
+print("Feature Engineering data took", (t1 - t0)/60, "minutes")
+
+
+#%% 7. Final Processing:
+# Trim first 200 obs from every ticker, as they are now full of NAs replaced with 0s
+# Drop NAs in the y variable
+# Drop OHLCA values, as they are no longer stationary
+# 2. Basic Data Cleaning
+# t0 = time.time()
+# stocks = clean_stocks(stocks, remove_1s=False)
+# t1 = time.time()
+# print("Cleaning data took", (t1 - t0), "seconds")
+
+#%% 8. UMAP features and save
+
+
 
 # SAVE/LOAD CHECKPOINT
 # stocks.to_parquet(stocks_path_parquet, index = False, compression='gzip')
 # stocks = pd.read_parquet(stocks_path_parquet)
 
-# %% 3. Add Target Variable
-#load stocks df if needed
-stocks = pd.read_parquet(stocks_path_parquet)
 
-stocks = add_target_ndays_change(stocks, ndays = 5)
 
-#And create just the datetime and target, as a final df, ready to be added to with engineered features
-engineered_df = stocks[['Date', 'y']].reset_index(drop = True)
-#%% 4.Initialise Feature data
 
-feature_functions_list = [
-    [engineer_ta_features, "ta"],
-    [engineer_basic_features, "basic"],
-     [engineer_zigzag_features,  "zigzag"],
-     [engineer_categorical_features, "categorical"]]
 
-'''
-NOTE: the categorical features must come LAST, as it relies on features built elsewhere 
-Approx cols produced by each function:
-engineer_basic_features() : 325
-engineer_ta_features() : 62*36 = 2,232
-engineer_zigzag_features() : 12
-engineer_categorical_features() : 139
 
-So have added in components as 500 based on this. The ideal way is to actually run a seperate PCA and reduce
-based on a cutoff eg 95%, but this adds an extra step to an already slow process
-'''
-
-# initialise  scaler and ipca models
-scaler = StandardScaler()
-n_components = 500  # Adjust based on desired dimensionality
-ipca = IncrementalPCA(n_components=n_components)
-
-#%% IGNORE THIS - BLOCK TO LOOP ALL FEATURE ENGINEERING IN ONE GO
-# below is alternate way to loop this. But its so slow, its easier to do it in steps and save it
-# for sub_list in feature_functions_list:
-#     func = sub_list[stocks]
-#     prefix = sub_list[1]
-
-#     # Generate new features
-#     X = func(stocks)
-    
-#     # Scale and update the scaler model
-#     scaled_X = scaler.partial_fit_transform(X)
-    
-#     # Apply IncrementalPCA and update the PCA model
-#     reduced_X = ipca.partial_fit_transform(scaled_X)
-
-#     #Add column names to results
-#     column_names = [f"{prefix}_{i+1}" for i in range(X.shape[1])]
-#     output = pd.DataFrame(reduced_X, columns=column_names)
-    
-#     engineered_df = pd.concat([engineered_df, output])
-
-#%%  NEW FIX IS FROM HERE:
-# Add basic features - approx 9 mins
-stocks = pd.read_parquet(stocks_path_parquet)
-stocks['Date'] = pd.to_datetime(stocks['Date'])
-stocks = add_target_ndays_change(stocks, ndays = 5)
-model_container = {'ipca': IncrementalPCA(n_components=50),
-                     'scaler': StandardScaler()}
-data = stocks[stocks['Ticker'].isin(['MSFT', 'V'])]
-
-t0 = time.time()
-test2 = data.groupby('Ticker').apply(engineer_basic_features_group, model_container = model_container).reset_index(drop=True)
-
-t1 = time.time()
-print("Feature Engineering data took", (t1 - t0)/60, "minutes")
 
 
 
@@ -137,7 +151,7 @@ with open(f"{upper_path}ta.txt", "w") as file:
 
 t1 = time.time()
 print("Feature Engineering data took", (t1 - t0)/60, "minutes")
-
+#currently taking 3.22 minutes on the sampel set,  x*380 on the full set
 #%% Add basic features
 #if needed
 #scaler = load(scaler_model_path)
