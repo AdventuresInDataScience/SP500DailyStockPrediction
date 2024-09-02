@@ -5,13 +5,14 @@
 stocks_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/spy1d.csv"
 constituents_path = "C:/Users/malha/Documents/Data/S&P 500 Historical Components & Changes(08-17-2024).csv"
 upper_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/"
-stocks_path_parquet = (
-    "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/stocks1d.parquet.gzip"
-)
-final_data_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/final_data_parquet.gzip"
-scaler_model_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/scaler_model_parquet.gzip"
-ipca_model_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/ipca_model_parquet.gzip"
+stocks_path_parquet = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/stocks1d.parquet.gzip"
 
+final_data_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/final_data_parquet.gzip"
+basic_model_dict_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/basic_model_dict.joblib"
+ta_model_dict_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/ta_model_dict.joblib"
+zz_model_dict_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/zz_model_dict.joblib"
+sic_model_dict_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/sic_model_dict.joblib"
+umap_model_path = "C:/Users/malha/Documents/Data/SP500DailyStockPrediction/umap_model.joblib"
 ##############################################################################
 # Model Config
 

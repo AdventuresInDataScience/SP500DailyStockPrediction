@@ -10,6 +10,9 @@ from config import *
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import IncrementalPCA
 
+#####################################
+# Data Retreival Functions
+####################################
 
 def make_ticker_list():
     constituents = pd.read_csv(constituents_path)
@@ -48,7 +51,7 @@ def get_yahoo_data(ticker_list, constituents, interval="1d"):
     df3 = df.merge(df2, how="left", on="Ticker")
     return df3
 
-def clean_stocks(stocks, remove_1s):
+def clean_stocks(stocks, remove_1s == False):
     # remove those stocks where the open is 0, this is clearly wrong
     stocks = stocks[stocks["Open"] != 0]
     # trim outliers below the 0.4% percentile, and above 99.6%
@@ -68,45 +71,6 @@ def clean_stocks(stocks, remove_1s):
     stocks = stocks.reset_index(drop = True)
     return stocks
 
-def update_engineerd_df(engineered_df, stocks, scaler, ipca, sub_list):
-    '''
-    Runs stocks df through a feature engineering function (as per the arguments), scaling and
-    reducing features via PCA
-    it returns the final engineered df, with this new set of features joined in
-    as well as the updated scaler and ipca model
-    '''
-    func = sub_list[0]
-    prefix = sub_list[1]
-
-    # Generate new features
-    X = func(stocks)
-    # Scale and update the scaler model
-    scaled_X = scaler.partial_fit_transform(X)
-    # Apply IncrementalPCA and update the PCA model
-    reduced_X = ipca.partial_fit_transform(scaled_X)
-    #Add column names to results
-    column_names = [f"{prefix}_{i+1}" for i in range(X.shape[1])]
-    output = pd.DataFrame(reduced_X, columns=column_names)
-    #join to enginnerd_df (final df)
-    engineered_df = pd.concat([engineered_df, output])
-
-    return (engineered_df, scaler, ipca)
-
-def umap_reduce(stocks, X, y = 'y', prefix = "", n = 15, components = 20, metric = 'l2'):
-    '''
-reduces X variables, based on y. Returns:
-[0] new df where the X vars have been repoaced with a smaller set of X variables
-[1] The already fitted reducer model used to reduce the features
-    '''
-    
-    reducer = umap.UMAP(n_neighbors=n, min_dist=0.1, n_components=components, target_metric= metric)
-    X_umap = reducer.fit_transform(X = X, y=stocks[y])
-
-    column_names = [f"{prefix}_{i+1}" for i in range(X_umap.shape[1])]
-    output = pd.DataFrame(X_umap, columns=column_names)
-    output = pd.concat([stocks, output])
-    return (output, reducer)
-
 def add_target_ndays_change(stocks, ndays = 5):
     nextdayopen = stocks.groupby("Ticker")["Open"].shift(-1)
     futureclose = stocks.groupby("Ticker")["Close"].shift(-ndays)
@@ -115,8 +79,11 @@ def add_target_ndays_change(stocks, ndays = 5):
     del futureclose
     return stocks
 
-#Downcast for memory
+#####################################
+# Memory Reduction Functions
+####################################
 def memory_downcast_auto(df):
+    # Unfortunately it wont fully work for some silly reason! Categoricals won't encode
     for col in df.select_dtypes('number'):
         df[col] = pd.to_numeric(df[col], downcast='integer')
         if df[col].dtype == 'float':
@@ -124,7 +91,7 @@ def memory_downcast_auto(df):
     for col in df.select_dtypes('object'):
         df[col] = df[col].astype('category')
     return df
-# Unfortunately it wont fully work for some silly reason! Categoricals won't encode
+
 def memory_downcast_numeric(df):
     for col in df.select_dtypes('number'):
         df[col] = pd.to_numeric(df[col], downcast='integer')
@@ -143,48 +110,9 @@ def memory_downcast_all(df):
         df[col] = df[col].astype('category')
     return df
 
-
-# #######################
-# def add_target(stocks):
-#     nxtopn = stocks.groupby("Ticker")["Open"].shift(
-#         -1
-#     )  # .reset_index().reset_index(0,drop=True)
-#     nxtcls = stocks.groupby("Ticker")["Close"].shift(
-#         -1
-#     )  # .reset_index().reset_index(0,drop=True)
-#     stocks["y"] = (nxtcls - nxtopn) / nxtcls
-#     del nxtcls
-#     del nxtopn
-#     return stocks
-# ##############################
-
-# def join_files(stocks, etf_df, macro_df):
-#     # convert date columns to the dame dtype
-#     stocks["Date"] = pd.to_datetime(stocks["Date"])
-#     etf_df["Date"] = pd.to_datetime(etf_df["Date"])
-#     macro_df["Date"] = pd.to_datetime(macro_df["Date"])
-#     # merge
-#     df = stocks.merge(etf_df, on="Date", how="left")
-#     df = df.merge(macro_df, on="Date", how="left")
-#     return df
-
-# def umap_reduce_inline(X, y, n = 15, components = 4, metric = 'l2'):
-#     '''
-#     reduces X variables, based on y. Does this during feature construction, so as to  limit memory
-#     by making changes step by step rather than on the whole feature set:
-#     [0] new, smaller set of X variables
-#     [1] The already fitted reducer model used to reduce the features
-#     '''
-#     reducer = umap.UMAP(n_neighbors=n, min_dist=0.1, n_components=components, target_metric= metric)
-#     X_umap = reducer.fit_transform(X = X, y=y)
-
-#     naming_string = "string1"
-#     # Create column names
-#     column_names = [f"{naming_string}_{i+1}" for i in range(X_umap.shape[1])]
-#     # Convert to Pandas DataFrame
-#     df = pd.DataFrame(X_umap, columns=column_names)
-#     return (X_umap, reducer)
-
+#####################################
+# Feature Engineering Functions
+####################################
 def engineer_basic_features_group(group, model_container):
     '''
     returns a df of basic features only, no other values
@@ -227,10 +155,7 @@ def engineer_basic_features_group(group, model_container):
     df["Last.Gap"] = (group["Open"] - group["Close"].shift(1)) / group["Open"]
     # 10 - Feature Engineer 10 - normalised value for Volume
     for n in range(2, 40):
-        if group["Volume"] > 0:
-            df["Volume.change{n}"] = (group["Volume"] - group["Volume"].shift(1)) / group["Volume"]
-        else:
-            df["Volume.change{n}"] = 0
+        df["Volume.change{n}"] = (group["Volume"] - group["Volume"].shift(1)) / group["Volume"]
             
     df = df.copy()
     # 11 - Dates
@@ -433,6 +358,7 @@ def engineer_categorical_features(stocks, model_container, column_list = OHE_lis
         tempdf = pd.get_dummies(stocks[column], prefix=column)
         df = pd.concat([df, tempdf], axis = 1)
     
+    stocks = stocks.drop(columns = OHE_list)
     df = df.copy()
 
     #B) Reduce Features
@@ -451,9 +377,53 @@ def engineer_categorical_features(stocks, model_container, column_list = OHE_lis
     column_names = [f"sic{i+1}" for i in range(reduced_X.shape[1])]
     output = pd.DataFrame(reduced_X, columns=column_names, index = df.index)    
     #join to engineerd_df (final df)
-    result = pd.concat([df, output], axis=1)
+    result = pd.concat([stocks, output], axis=1)
     # Update the global models in the container
     model_container['ipca'] = ipca
     model_container['scaler'] = scaler
 
     return result 
+
+def final_processing(df, **kwargs):
+    # Trim first 200 obs from every ticker, as they are now full of NAs which had to be replaced with 0s
+    # To use onward pca and scaler models
+    df = df.groupby('Ticker').apply(lambda x: x.iloc[200:]).reset_index(drop=True)
+    df = df.copy()
+
+    # Drop NAs in the y variable
+    df = df.dropna()
+
+    #Basic Data Cleaning
+    #df = clean_stocks(df, **kwargs)
+
+    # Finally Drop OHLCA values, as they are no longer stationary
+    df = df.drop(columns = ['Open','High','Low','Close','Adj Close', 'Volume', 'Ticker'])
+    
+    return df
+
+#####################################
+# Feature Reduction Functions
+####################################
+def umap_reduce_supervised(df, n = 15, components = 10, metric = 'l2'):
+    '''
+    reduces X variables, based on y.
+    Returns:
+    [0] The reduced df
+    [1] The already fitted UMAP reducer model used to reduce the features
+    '''
+    df = df.reset_index(drop = True)
+    X = df.drop(columns = ['Date', 'y'])
+    y = df['y']
+
+    reducer = umap.UMAP(n_neighbors=n, min_dist=0.1, n_components=components, target_metric= metric)
+    X_umap = reducer.fit_transform(X = X, y=y)
+
+    # Create column names
+    column_names = [f"umap_{i+1}" for i in range(X_umap.shape[1])]
+
+    # Convert to Pandas DataFrame
+    X = pd.DataFrame(X_umap, columns=column_names)
+
+    #rejoin with y
+    output = pd.concat([df['Date'], X, y], axis = 1)
+    return (output, reducer)
